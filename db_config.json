@@ -1,0 +1,15 @@
+{
+    "database": {
+        "type": "sqlite",
+        "path": "./bird_feedings.db",
+        "backup_interval": 3600
+    },
+    "production": {
+        "type": "postgresql",
+        "host": "localhost",
+        "port": 5432,
+        "database": "birdfeeding",
+        "user": "birdapp",
+        "password": "secure_password"
+    }
+}

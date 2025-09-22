@@ -1,0 +1,7 @@
+# Bird Feeding Project Dependencies
+flask>=2.3.0
+requests>=2.28.0
+
+# Additional dependencies (uncomment as needed):
+# numpy>=1.21.0
+# pandas>=1.5.0
