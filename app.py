@@ -11,7 +11,14 @@ import json
 import os
 import requests
 
+from observe_logger import ObserveLogger, observe_track
+from java_integration import JavaBirdAnalyzer, JavaReportGenerator, MavenArtifactManager, check_java_availability
+
 app = Flask(__name__)
+
+# Initialize Observe logging
+observe_logger = ObserveLogger(app, 'config/observe_config.json')
+app.observe_logger = observe_logger
 
 # Database configuration
 DATABASE = 'bird_feedings.db'
@@ -20,8 +27,8 @@ def load_db_config():
     """Load database configuration from local file or Nexus"""
     try:
         # Try to load from local config file first
-        if os.path.exists('db_config.json'):
-            with open('db_config.json', 'r') as f:
+        if os.path.exists('config/db_config.json'):
+            with open('config/db_config.json', 'r') as f:
                 config = json.load(f)
                 return config.get('database', {})
         
@@ -92,19 +99,35 @@ def home():
             'quantity': 25,
             'location': 'Backyard feeder',
             'notes': 'Morning feeding'
+        },
+        'java_integration': {
+            'available': check_java_availability(),
+            'features': ['Advanced Analytics', 'PDF Reports', 'Maven Artifacts']
         }
     })
 
 @app.route('/api/feedings', methods=['POST'])
+@observe_track('bird_feeding_created')
 def add_feeding():
     """Add a new bird feeding record"""
     try:
         data = request.get_json()
         
+        # Log business event
+        app.observe_logger.log_business_event('feeding_request_received', {
+            'bird_type': data.get('bird_type'),
+            'food_type': data.get('food_type'),
+            'quantity': data.get('quantity')
+        })
+        
         # Validate required fields
         required_fields = ['bird_type', 'food_type', 'quantity']
         for field in required_fields:
             if not data.get(field):
+                app.observe_logger.log_business_event('feeding_validation_failed', {
+                    'missing_field': field,
+                    'provided_data': list(data.keys())
+                }, 'WARNING')
                 return jsonify({'error': f'Missing required field: {field}'}), 400
         
         # Insert into database
@@ -124,6 +147,14 @@ def add_feeding():
         conn.commit()
         conn.close()
         
+        # Log successful creation
+        app.observe_logger.log_business_event('feeding_created_successfully', {
+            'feeding_id': feeding_id,
+            'bird_type': data['bird_type'],
+            'food_type': data['food_type'],
+            'quantity': data['quantity']
+        })
+        
         return jsonify({
             'message': 'Feeding recorded successfully',
             'id': feeding_id,
@@ -131,9 +162,15 @@ def add_feeding():
         }), 201
         
     except Exception as e:
+        app.observe_logger.log_error(e, {
+            'endpoint': '/api/feedings',
+            'method': 'POST',
+            'data': data if 'data' in locals() else None
+        })
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/feedings', methods=['GET'])
+@observe_track('bird_feedings_retrieved')
 def get_feedings():
     """Get all bird feeding records"""
     try:
@@ -158,9 +195,20 @@ def get_feedings():
                 'feeding_time': feeding['feeding_time']
             })
         
+        # Log business metrics
+        app.observe_logger.log_business_event('feedings_retrieved', {
+            'total_records': len(feeding_list),
+            'unique_birds': len(set(f['bird_type'] for f in feeding_list)),
+            'total_quantity': sum(f['quantity'] for f in feeding_list)
+        })
+        
         return jsonify(feeding_list)
         
     except Exception as e:
+        app.observe_logger.log_error(e, {
+            'endpoint': '/api/feedings',
+            'method': 'GET'
+        })
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stats', methods=['GET'])
@@ -200,6 +248,131 @@ def get_stats():
             'most_common_bird': common_bird[0] if common_bird else None,
             'most_common_food': common_food[0] if common_food else None,
             'total_food_quantity': total_quantity
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analyze', methods=['POST'])
+@observe_track('java_analysis_requested')
+def analyze_with_java():
+    """Advanced analysis using Java libraries"""
+    try:
+        # Get all feeding records for analysis
+        conn = get_db_connection()
+        feedings = conn.execute('''
+            SELECT * FROM bird_feedings 
+            ORDER BY feeding_time DESC
+        ''').fetchall()
+        conn.close()
+        
+        # Convert to list of dictionaries
+        feeding_list = []
+        for feeding in feedings:
+            feeding_list.append({
+                'id': feeding['id'],
+                'bird_type': feeding['bird_type'],
+                'food_type': feeding['food_type'],
+                'quantity': feeding['quantity'],
+                'location': feeding['location'],
+                'notes': feeding['notes'],
+                'feeding_time': feeding['feeding_time']
+            })
+        
+        # Log business event
+        app.observe_logger.log_business_event('java_analysis_started', {
+            'total_records': len(feeding_list),
+            'analysis_type': 'pattern_analysis'
+        })
+        
+        # Use Java analyzer
+        analyzer = JavaBirdAnalyzer()
+        analysis_result = analyzer.analyze_feeding_patterns(feeding_list)
+        
+        # Log successful analysis
+        app.observe_logger.log_business_event('java_analysis_completed', {
+            'records_analyzed': len(feeding_list),
+            'analysis_engine': analysis_result.get('analysis_engine', 'Unknown')
+        })
+        
+        return jsonify(analysis_result)
+        
+    except Exception as e:
+        app.observe_logger.log_error(e, {
+            'endpoint': '/api/analyze',
+            'method': 'POST',
+            'analysis_type': 'java_integration'
+        })
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/report', methods=['POST'])
+@observe_track('pdf_report_requested')
+def generate_report():
+    """Generate PDF report using Java libraries"""
+    try:
+        data = request.get_json()
+        report_type = data.get('type', 'summary')
+        
+        # Get analysis data
+        analyzer = JavaBirdAnalyzer()
+        conn = get_db_connection()
+        feedings = conn.execute('''
+            SELECT * FROM bird_feedings 
+            ORDER BY feeding_time DESC
+        ''').fetchall()
+        conn.close()
+        
+        feeding_list = [dict(feeding) for feeding in feedings]
+        analysis_data = analyzer.analyze_feeding_patterns(feeding_list)
+        
+        # Generate report
+        report_generator = JavaReportGenerator()
+        output_path = f"reports/bird_feeding_report_{report_type}.pdf"
+        
+        os.makedirs('reports', exist_ok=True)
+        success = report_generator.generate_pdf_report(analysis_data, output_path)
+        
+        if success:
+            app.observe_logger.log_business_event('report_generated', {
+                'report_type': report_type,
+                'output_path': output_path,
+                'records_included': len(feeding_list)
+            })
+            
+            return jsonify({
+                'message': 'Report generated successfully',
+                'path': output_path,
+                'type': report_type
+            })
+        else:
+            return jsonify({'error': 'Report generation failed'}), 500
+            
+    except Exception as e:
+        app.observe_logger.log_error(e, {
+            'endpoint': '/api/report',
+            'method': 'POST'
+        })
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/java/status', methods=['GET'])
+def java_status():
+    """Check Java integration status"""
+    try:
+        java_info = check_java_availability()
+        
+        # Check for JAR files
+        jar_files = []
+        if os.path.exists('java/'):
+            jar_files = [f for f in os.listdir('java/') if f.endswith('.jar')]
+        
+        maven_manager = MavenArtifactManager()
+        available_jars = maven_manager.list_available_jars()
+        
+        return jsonify({
+            'java_runtime': java_info,
+            'jar_files': jar_files,
+            'nexus_jars': available_jars,
+            'integration_ready': java_info.get('available', False)
         })
         
     except Exception as e:

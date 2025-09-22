@@ -1,0 +1,19 @@
+{
+    "observe": {
+        "enabled": true,
+        "customer_id": "YOUR_OBSERVE_CUSTOMER_ID",
+        "api_token": "YOUR_OBSERVE_API_TOKEN",
+        "collect_url": "https://collect.observe.inc",
+        "service_name": "bird-feeding-api",
+        "environment": "development",
+        "log_level": "INFO",
+        "batch_size": 100,
+        "flush_interval": 30
+    },
+    "logging": {
+        "format": "json",
+        "include_request_id": true,
+        "include_user_context": true,
+        "sensitive_fields": ["password", "token", "api_key"]
+    }
+}

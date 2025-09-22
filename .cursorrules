@@ -1,0 +1,49 @@
+# Cursor IDE Rules for Bird Feeding Project
+
+## Project Context
+This is a hobby project for learning Nexus Repository management with a Flask API for tracking bird feeding activities.
+
+## Key Technologies
+- Flask (API framework)
+- SQLite (database)
+- Nexus Repository (package management)
+- Python 3.9+
+
+## Important Patterns
+1. Always use Nexus repository for package installation: `PIP_CONFIG_FILE=config/pip.conf pip3 install <package>`
+2. Configuration priority: Local file → Nexus repository → Defaults
+3. API runs on port 8080 (not 5000 due to macOS AirPlay conflict)
+4. Standard library modules (datetime, json, os) don't go through Nexus
+
+## Code Style
+- Use Flask best practices
+- Include proper error handling
+- Add docstrings for functions
+- Use type hints where helpful
+- Keep API responses consistent
+
+## Security Considerations
+- This is educational - don't use in production without proper security
+- Nexus credentials are in plain text (demo only)
+- No authentication on API endpoints (hobby project)
+
+## Testing
+- Test API endpoints manually with curl
+- Verify Nexus repository integration
+- Check database operations
+
+## File Structure
+- `app.py` - Main Flask application
+- `observe_logger.py` - Observe.inc integration
+- `config/` - All configuration files
+  - `pip.conf` - Nexus repository configuration
+  - `db_config.json` - Database configuration
+  - `observe_config.json` - Observability settings
+- `docs/` - Documentation and team knowledge
+- `scripts/` - Utility and demo scripts
+- `logs/` - Application logs (runtime)
+
+## Common Issues
+- Port 5000 conflicts with AirPlay on macOS
+- urllib3 import errors require package reinstallation
+- Missing packages should be installed via Nexus configuration
