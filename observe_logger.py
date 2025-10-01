@@ -131,13 +131,25 @@ class ObserveLogger:
             "path": request.path,
             "status_code": response.status_code,
             "duration_ms": round(duration * 1000, 2),
-            "response_size": len(response.get_data()),
+            "response_size": self._get_response_size(response),
             "timestamp": datetime.utcnow().isoformat(),
             "service": self.config['observe'].get('service_name', 'bird-feeding-api')
         }
         
         self.send_to_observe(log_data)
-    
+
+    def _get_response_size(self, response):
+        """Safely get response size, handling static files and streaming responses"""
+        try:
+            if hasattr(response, 'content_length') and response.content_length:
+                return response.content_length
+            elif hasattr(response, 'get_data'):
+                return len(response.get_data())
+        except (RuntimeError, AttributeError):
+            # Handle direct passthrough mode for static files
+            pass
+        return 0
+
     def log_business_event(self, event_type: str, data: Dict[str, Any], level: str = "INFO"):
         """Log business logic events"""
         if not self.enabled:
