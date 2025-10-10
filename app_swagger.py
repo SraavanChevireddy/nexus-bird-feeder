@@ -13,7 +13,6 @@ import os
 import requests
 
 from observe_logger import ObserveLogger, observe_track
-from java_integration import JavaBirdAnalyzer, JavaReportGenerator, MavenArtifactManager, check_java_availability
 
 app = Flask(__name__)
 
@@ -118,25 +117,9 @@ stats_model = api.model('FeedingStats', {
     'total_food_quantity': fields.Integer(description='Total amount of food given in grams')
 })
 
-java_status_model = api.model('JavaStatus', {
-    'java_runtime': fields.Raw(description='Java runtime information'),
-    'jar_files': fields.List(fields.String, description='Available JAR files'),
-    'nexus_jars': fields.List(fields.String, description='JAR files in Nexus repository'),
-    'integration_ready': fields.Boolean(description='Whether Java integration is ready')
-})
-
-analysis_request_model = api.model('AnalysisRequest', {
-    'type': fields.String(description='Type of analysis to perform', example='pattern_analysis')
-})
-
-report_request_model = api.model('ReportRequest', {
-    'type': fields.String(description='Type of report to generate', example='summary', enum=['summary', 'detailed', 'analytics'])
-})
-
 # Define namespaces
 feedings_ns = api.namespace('feedings', description='Bird feeding operations')
 stats_ns = api.namespace('stats', description='Feeding statistics')
-java_ns = api.namespace('java', description='Java integration features')
 
 @api.route('/')
 class Home(Resource):
@@ -148,16 +131,9 @@ class Home(Resource):
             'endpoints': {
                 'POST /feedings/': 'Add a new bird feeding record',
                 'GET /feedings/': 'Get all bird feeding records',
-                'GET /stats/': 'Get feeding statistics',
-                'POST /java/analyze/': 'Advanced analysis using Java libraries',
-                'POST /java/report/': 'Generate PDF reports using Java libraries',
-                'GET /java/status/': 'Check Java integration status'
+                'GET /stats/': 'Get feeding statistics'
             },
-            'swagger_ui': '/swagger/',
-            'java_integration': {
-                'available': check_java_availability(),
-                'features': ['Advanced Analytics', 'PDF Reports', 'Maven Artifacts']
-            }
+            'swagger_ui': '/swagger/'
         }
 
 @feedings_ns.route('/')
@@ -312,136 +288,6 @@ class Stats(Resource):
         except Exception as e:
             api.abort(500, str(e))
 
-@java_ns.route('/analyze/')
-class JavaAnalyze(Resource):
-    @java_ns.expect(analysis_request_model, validate=False)
-    @observe_track('java_analysis_requested')
-    def post(self):
-        """Perform advanced feeding pattern analysis using Java libraries"""
-        try:
-            # Get all feeding records for analysis
-            conn = get_db_connection()
-            feedings = conn.execute('''
-                SELECT * FROM bird_feedings
-                ORDER BY feeding_time DESC
-            ''').fetchall()
-            conn.close()
-
-            # Convert to list of dictionaries
-            feeding_list = []
-            for feeding in feedings:
-                feeding_list.append({
-                    'id': feeding['id'],
-                    'bird_type': feeding['bird_type'],
-                    'food_type': feeding['food_type'],
-                    'quantity': feeding['quantity'],
-                    'location': feeding['location'],
-                    'notes': feeding['notes'],
-                    'feeding_time': feeding['feeding_time']
-                })
-
-            # Log business event
-            app.observe_logger.log_business_event('java_analysis_started', {
-                'total_records': len(feeding_list),
-                'analysis_type': 'pattern_analysis'
-            })
-
-            # Use Java analyzer
-            analyzer = JavaBirdAnalyzer()
-            analysis_result = analyzer.analyze_feeding_patterns(feeding_list)
-
-            # Log successful analysis
-            app.observe_logger.log_business_event('java_analysis_completed', {
-                'records_analyzed': len(feeding_list),
-                'analysis_engine': analysis_result.get('analysis_engine', 'Unknown')
-            })
-
-            return analysis_result
-
-        except Exception as e:
-            app.observe_logger.log_error(e, {
-                'endpoint': '/java/analyze/',
-                'method': 'POST',
-                'analysis_type': 'java_integration'
-            })
-            api.abort(500, str(e))
-
-@java_ns.route('/report/')
-class JavaReport(Resource):
-    @java_ns.expect(report_request_model)
-    @observe_track('pdf_report_requested')
-    def post(self):
-        """Generate comprehensive PDF reports using Java libraries"""
-        try:
-            data = request.get_json()
-            report_type = data.get('type', 'summary') if data else 'summary'
-
-            # Get analysis data
-            analyzer = JavaBirdAnalyzer()
-            conn = get_db_connection()
-            feedings = conn.execute('''
-                SELECT * FROM bird_feedings
-                ORDER BY feeding_time DESC
-            ''').fetchall()
-            conn.close()
-
-            feeding_list = [dict(feeding) for feeding in feedings]
-            analysis_data = analyzer.analyze_feeding_patterns(feeding_list)
-
-            # Generate report
-            report_generator = JavaReportGenerator()
-            output_path = f"reports/bird_feeding_report_{report_type}.pdf"
-
-            os.makedirs('reports', exist_ok=True)
-            success = report_generator.generate_pdf_report(analysis_data, output_path)
-
-            if success:
-                app.observe_logger.log_business_event('report_generated', {
-                    'report_type': report_type,
-                    'output_path': output_path,
-                    'records_included': len(feeding_list)
-                })
-
-                return {
-                    'message': 'Report generated successfully',
-                    'path': output_path,
-                    'type': report_type
-                }
-            else:
-                api.abort(500, 'Report generation failed')
-
-        except Exception as e:
-            app.observe_logger.log_error(e, {
-                'endpoint': '/java/report/',
-                'method': 'POST'
-            })
-            api.abort(500, str(e))
-
-@java_ns.route('/status/')
-class JavaStatus(Resource):
-    @java_ns.marshal_with(java_status_model)
-    def get(self):
-        """Check Java integration status and available components"""
-        try:
-            java_info = check_java_availability()
-
-            # Check for JAR files
-            jar_files = []
-            if os.path.exists('java/'):
-                jar_files = [f for f in os.listdir('java/') if f.endswith('.jar')]
-
-            maven_manager = MavenArtifactManager()
-            available_jars = maven_manager.list_available_jars()
-
-            return {
-                'java_runtime': java_info,
-                'jar_files': jar_files,
-                'nexus_jars': available_jars,
-                'integration_ready': java_info.get('available', False)
-            }
-
-        except Exception as e:
-            api.abort(500, str(e))
 
 if __name__ == '__main__':
     # Initialize database on startup
@@ -456,8 +302,5 @@ if __name__ == '__main__':
     print("   POST /feedings/           - Add new feeding")
     print("   GET  /feedings/           - Get all feedings")
     print("   GET  /stats/              - Get statistics")
-    print("   POST /java/analyze/       - Advanced Java analysis")
-    print("   POST /java/report/        - Generate PDF reports")
-    print("   GET  /java/status/        - Java integration status")
 
     app.run(debug=True, host='0.0.0.0', port=8000)
