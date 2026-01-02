@@ -22,13 +22,7 @@ bird-feeding/
 │   └── .project-memory.md         # Complete project knowledge base
 ├── 📁 scripts/                     # Utility scripts
 │   ├── demo_observe.py            # Observe logging demo
-│   ├── demo_java.py               # Java integration demo
-│   ├── build_java.py              # Java build automation
 │   └── setup_team.py              # Team setup automation
-├── 📁 java/                        # Java integration
-│   ├── src/com/birdfeeding/       # Java source code
-│   ├── pom.xml                    # Maven configuration
-│   └── bird-analyzer.jar          # Built JAR file
 ├── 📁 logs/                        # Log files (created at runtime)
 └── 📁 .cursorrules                 # Cursor IDE configuration
 ```
@@ -74,15 +68,10 @@ bird-feeding/
 ## 🌐 API Endpoints
 
 ### Core Endpoints
-- `GET /` - API information with Java integration status
+- `GET /` - API information
 - `POST /api/feedings` - Add bird feeding record
 - `GET /api/feedings` - Retrieve feeding records  
 - `GET /api/stats` - Get feeding statistics
-
-### Java-Enhanced Endpoints
-- `POST /api/analyze` - Advanced pattern analysis using Java
-- `POST /api/report` - Generate PDF reports with Java libraries
-- `GET /api/java/status` - Check Java integration status
 
 ## 🔧 Configuration
 
@@ -97,24 +86,19 @@ All configuration files are in the `config/` directory:
 # Install via Nexus
 PIP_CONFIG_FILE=config/pip.conf pip3 install -r requirements.txt
 
-# Build Java components
-python3 scripts/build_java.py
-
 # Run with hot reload
 python3 app.py
 
 # Demo features
 python3 scripts/demo_observe.py  # Observability
-python3 scripts/demo_java.py     # Java integration
 ```
 
 ## 📊 Technology Stack
 
 - **Backend**: Flask 3.x, SQLite
-- **Java Integration**: JPype1, Maven, Custom JAR libraries
-- **Package Management**: Nexus Repository Manager (PyPI + Maven)
+- **Package Management**: Nexus Repository Manager (PyPI)
 - **Observability**: Observe.inc, structlog
-- **Development**: Python 3.8+, Java 11+, Maven 3.6+
+- **Development**: Python 3.8+
 
 ---
 

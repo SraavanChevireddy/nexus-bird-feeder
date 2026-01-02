@@ -9,9 +9,6 @@ flask-restx>=1.3.0
 structlog>=22.0.0
 python-json-logger>=2.0.0
 
-# Java integration
-JPype1>=1.4.0
-
 # Additional dependencies (uncomment as needed):
 # numpy>=1.21.0
 # pandas>=1.5.0
